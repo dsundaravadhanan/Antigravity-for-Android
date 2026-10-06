@@ -6,6 +6,10 @@
 # background daemon services, DNS configurations, CLI wrappers, and binary
 # modifications, restoring the system to a clean, upstream Antigravity CLI installation.
 #
+# Supports both:
+# 1. Official Google native Android releases
+# 2. Wallentx community builds
+#
 # Preserved:
 # - User authentication tokens and chat session history in ~/.gemini/
 # - Android storage permissions (termux-setup-storage)
@@ -100,6 +104,7 @@ LAUNCHERS=(
     "$BIN_DIR/agy-ui"
     "$BIN_DIR/agy-service"
     "$BIN_DIR/agy-patch"
+    "$BIN_DIR/agy-patch-official"
 )
 
 for file in "${LAUNCHERS[@]}"; do
@@ -108,6 +113,15 @@ for file in "${LAUNCHERS[@]}"; do
         echo "      Removed: $file"
     fi
 done
+
+# Clean up xdg-open if it is a symlink pointing to termux-open
+if [ -L "$BIN_DIR/xdg-open" ]; then
+    TARGET_LINK=$(readlink "$BIN_DIR/xdg-open" 2>/dev/null || true)
+    if [[ "$TARGET_LINK" == *"termux-open"* ]]; then
+        rm -f "$BIN_DIR/xdg-open"
+        echo "      Removed browser bridge: $BIN_DIR/xdg-open"
+    fi
+fi
 
 # Clean up daemon log file
 LOG_FILE="$HOME/.gemini/antigravity-cli/log/hub.log"
@@ -131,9 +145,22 @@ if [ -f "$RESOLV_CONF" ]; then
 fi
 
 # ==============================================================================
-# [5/5] Restore Upstream Binary Assets
+# [5/5] Restore Upstream Binary Assets (Safe Pre-Check)
 # ==============================================================================
 echo "[5/5] Restoring upstream binary state..."
+
+is_official_engine() {
+    if [ -f "$HOME/.local/bin/agy" ]; then
+        return 0
+    fi
+    if [ -L "$BIN_DIR/agy" ]; then
+        TARGET=$(readlink "$BIN_DIR/agy" 2>/dev/null || true)
+        if [[ "$TARGET" == *".local/bin"* ]]; then
+            return 0
+        fi
+    fi
+    return 1
+}
 
 revert_binary_inplace() {
     python3 - << 'PYEOF'
@@ -144,6 +171,7 @@ candidates = [
     os.path.join(prefix, "bin", "agy.va39"),
     os.path.join(prefix, "bin", "agy.orig"),
     os.path.join(prefix, "bin", "agy"),
+    os.path.join(os.environ.get("HOME", ""), ".local", "bin", "agy"),
     "bin/agy.va39"
 ]
 
@@ -167,6 +195,7 @@ try:
 
     eocd_idx = data.rfind(b'PK\x05\x06')
     if eocd_idx == -1:
+        # Binary does not have embedded web zip archive; already upstream state
         sys.exit(0)
 
     size_cd = int.from_bytes(data[eocd_idx+12:eocd_idx+16], 'little')
@@ -187,10 +216,10 @@ try:
     old_comp = data[data_offset : data_offset + info.compress_size]
     decomp = zlib.decompress(old_comp, -15)
 
-    gift = b"\xf0\x9f\x8e\x81"
-    if gift in decomp and b'<title>Jetski Web</title>' in decomp:
-        # Already restored or upstream default
-        print(f"      Default web assets already present on {target}")
+    # Check if custom branding patch was ever applied
+    has_custom_branding = (b'<title>Antigravity CLI</title>' in decomp and b'url(%23m)' in decomp)
+    if not has_custom_branding:
+        print(f"      No custom branding patch detected on {target}. Binary is in original upstream state.")
         sys.exit(0)
 
     # 1. Restore Title
@@ -256,14 +285,22 @@ PYEOF
 
 if command -v python3 >/dev/null 2>&1; then
     if ! revert_binary_inplace; then
+        if is_official_engine; then
+            echo "      Official Google Antigravity binary verified."
+        else
+            echo "      Note: Refreshing pristine binary from upstream repository..."
+            export AGY_INSTALL_SKIP_LAUNCH=1
+            curl -fsSL https://raw.githubusercontent.com/wallentx/antigravity-cli-termux/dev/install.sh | bash >/dev/null 2>&1 || true
+        fi
+    fi
+else
+    if is_official_engine; then
+        echo "      Official Google Antigravity binary verified."
+    else
         echo "      Note: Refreshing pristine binary from upstream repository..."
         export AGY_INSTALL_SKIP_LAUNCH=1
         curl -fsSL https://raw.githubusercontent.com/wallentx/antigravity-cli-termux/dev/install.sh | bash >/dev/null 2>&1 || true
     fi
-else
-    echo "      Python not found. Refreshing pristine binary from upstream repository..."
-    export AGY_INSTALL_SKIP_LAUNCH=1
-    curl -fsSL https://raw.githubusercontent.com/wallentx/antigravity-cli-termux/dev/install.sh | bash >/dev/null 2>&1 || true
 fi
 
 # ==============================================================================
@@ -274,13 +311,13 @@ echo "======================================================"
 echo "    Web GUI Successfully Removed / Reverted          "
 echo "======================================================"
 echo ""
-if [ -f "$BIN_DIR/agy" ]; then
+if [ -f "$BIN_DIR/agy" ] || [ -f "$HOME/.local/bin/agy" ]; then
     echo "Your upstream Antigravity CLI remains fully functional."
     echo "To launch the CLI in your terminal, simply run:"
     echo "  agy"
 else
-    echo "[-] Warning: Upstream 'agy' binary was not found in $BIN_DIR."
-    echo "    You can reinstall it cleanly from upstream with:"
-    echo "    curl -fsSL https://raw.githubusercontent.com/wallentx/antigravity-cli-termux/dev/install.sh | bash"
+    echo "[-] Warning: Upstream 'agy' binary was not found."
+    echo "    To reinstall official Google Antigravity, run:"
+    echo "    curl -fsSL https://antigravity.google/cli/install.sh | bash"
 fi
 echo ""
