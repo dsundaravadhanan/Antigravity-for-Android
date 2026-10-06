@@ -67,7 +67,21 @@ if [ -z "$OFFICIAL_BIN" ]; then
             echo ""
             echo "Installing official Google Antigravity CLI..."
             export AGY_INSTALL_SKIP_LAUNCH=1
-            curl -fsSL https://antigravity.google/cli/install.sh | bash
+            TMP_BOOTSTRAP="$(mktemp 2>/dev/null || echo "$HOME/.local/bin/agy_install_tmp.sh")"
+            if ! curl -fsSL --compressed https://antigravity.google/cli/install.sh -o "$TMP_BOOTSTRAP" 2>/dev/null; then
+                curl -fsSL https://antigravity.google/cli/install.sh -o "$TMP_BOOTSTRAP"
+            fi
+            if [ -f "$TMP_BOOTSTRAP" ] && gzip -t "$TMP_BOOTSTRAP" 2>/dev/null; then
+                gzip -dc "$TMP_BOOTSTRAP" > "${TMP_BOOTSTRAP}.raw" 2>/dev/null && mv -f "${TMP_BOOTSTRAP}.raw" "$TMP_BOOTSTRAP"
+            fi
+            if [ -f "$TMP_BOOTSTRAP" ] && head -n 1 "$TMP_BOOTSTRAP" | grep -q "^#\!"; then
+                bash "$TMP_BOOTSTRAP"
+                rm -f "$TMP_BOOTSTRAP" 2>/dev/null || true
+            else
+                rm -f "$TMP_BOOTSTRAP" 2>/dev/null || true
+                echo "[-] Error: Failed to fetch valid installer script from Google."
+                exit 1
+            fi
             echo ""
             OFFICIAL_BIN="$(find_official_bin)"
             if [ -z "$OFFICIAL_BIN" ]; then
@@ -79,7 +93,7 @@ if [ -z "$OFFICIAL_BIN" ]; then
             echo ""
             echo "To install official Google Antigravity manually, run:"
             echo "  export AGY_INSTALL_SKIP_LAUNCH=1"
-            echo "  curl -fsSL https://antigravity.google/cli/install.sh | bash"
+            echo "  curl -fsSL --compressed https://antigravity.google/cli/install.sh | bash"
             echo ""
             echo "Exiting."
             exit 0
