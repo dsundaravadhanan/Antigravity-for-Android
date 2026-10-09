@@ -6,9 +6,9 @@
 
 ## Visual Showcase & Setup Walkthrough
 
-| 1. Termux One-Line Installation | 2. Google OAuth Onboarding |
+| 1. Termux One-Line Installation (Live Demo) | 2. Google OAuth Onboarding |
 | :---: | :---: |
-| ![Termux Terminal Installation](assets/01-termux-install.jpg) | ![Google OAuth Sign-In](assets/02-google-signin.jpg) |
+| ![Termux Terminal Installation Demo](assets/01-termux-install.gif) | ![Google OAuth Sign-In](assets/02-google-signin.jpg) |
 
 | 3. Mobile Web GUI Chat Workspace | 4. Agent Permissions & Turbo Mode |
 | :---: | :---: |
