@@ -533,17 +533,24 @@ Start the server in Termux:
 The launcher automatically opens your Android browser at `http://localhost:4400`.
 
 ### How do I make the Antigravity Web GUI faster and smoother in Chrome?
-1. **Hardware-Accelerate Mobile Chrome (GPU Rasterization)**:
+1. **Hardware-Accelerate Mobile Chrome (GPU Flags)**:
    - In Chrome, open `chrome://flags`.
    - Search for and enable:
      - **GPU Rasterization** (`#enable-gpu-rasterization`) ➔ Set to **Enabled**
      - **Override software rendering list** (`#ignore-gpu-blocklist`) ➔ Set to **Enabled**
+     - **Zero-Copy Rasterizer** (`#enable-zero-copy`) ➔ Set to **Enabled** (writes tiles directly to GPU memory, bypassing CPU copying for faster code & diff scrolling)
+     - **Vulkan** (`#enable-vulkan`) ➔ Set to **Enabled** (for Snapdragon and Dimensity chips, reduces draw-call latency by up to 30%)
+     - **Smooth Scrolling** (`#smooth-scrolling`) ➔ Set to **Enabled**
    - Tap **Relaunch** at the bottom of Chrome.
-2. **Install as a Standalone PWA**:
+2. **Prevent Chrome from Freezing Localhost (Memory Saver Exclusion)**:
+   - In Chrome, go to **Settings** ➔ **Performance**.
+   - Under **Always keep these sites active** (or Memory Saver Exclusions), add: `http://localhost:4400`.
+   - Prevents Chrome from discarding the tab or disconnecting WebSockets when switching apps.
+3. **Install as a Standalone PWA**:
    - Open `http://localhost:4400` in Chrome.
    - Tap Chrome's three-dot menu (**⋮**) ➔ **Install app** (or **Add to Home screen**).
    - Runs full-screen with dedicated GPU rendering and no browser URL bar overhead.
-3. **Go Memory Optimization**:
+4. **Go Memory Optimization**:
    - `install.sh` automatically configures `export GOMEMLIMIT=1536MiB` in `~/.bashrc` to prevent GC thrashing and Android Low Memory Killer (LMK) process drops.
 
 ### How do I install Antigravity as a standalone Android app?
@@ -589,7 +596,7 @@ EOF
 **Fix**:
 1. Run `termux-wake-lock` inside Termux to acquire a CPU wake lock.
 2. In Android Settings -> **Apps** -> **Termux** -> **Battery**, select **Unrestricted** (turn off battery optimization).
-3. If using Samsung (One UI), Xiaomi (MIUI/HyperOS), or OnePlus (OxygenOS), lock Termux in recent apps so it is not cleared from RAM.
+3. **Lock Termux in Recent Apps**: Open your Android Recent Apps (App Switcher) screen, tap/long-press the Termux app icon or preview, and tap the **Padlock icon (Lock app)**. This prevents aggressive OEM task managers (Samsung One UI, Xiaomi HyperOS/MIUI, OnePlus OxygenOS) from flushing Termux from RAM.
 
 ### 4. OAuth Browser Tab Does Not Open During Sign-In
 **Cause**: Missing or broken browser bridge (`xdg-open`).  
