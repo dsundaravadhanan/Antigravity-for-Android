@@ -66,7 +66,6 @@ if [ -z "$OFFICIAL_BIN" ]; then
         [Yy]* )
             echo ""
             echo "Installing official Google Antigravity CLI..."
-            export AGY_INSTALL_SKIP_LAUNCH=1
             TMP_BOOTSTRAP="$(mktemp 2>/dev/null || echo "$HOME/.local/bin/agy_install_tmp.sh")"
             if ! curl -fsSL --compressed https://antigravity.google/cli/install.sh -o "$TMP_BOOTSTRAP" 2>/dev/null; then
                 curl -fsSL https://antigravity.google/cli/install.sh -o "$TMP_BOOTSTRAP"
@@ -92,7 +91,6 @@ if [ -z "$OFFICIAL_BIN" ]; then
         * )
             echo ""
             echo "To install official Google Antigravity manually, run:"
-            echo "  export AGY_INSTALL_SKIP_LAUNCH=1"
             echo "  curl -fsSL --compressed https://antigravity.google/cli/install.sh | bash"
             echo ""
             echo "Exiting."
@@ -132,6 +130,12 @@ unset GODEBUG 2>/dev/null || true
 if ! grep -q 'NODE_OPTIONS.*ipv4first' "$BASHRC" 2>/dev/null; then
     echo 'export NODE_OPTIONS="--dns-result-order=ipv4first"' >> "$BASHRC"
     [ "$SILENT" -eq 0 ] && echo "      Added NODE_OPTIONS=\"--dns-result-order=ipv4first\" to ~/.bashrc"
+fi
+
+# Optimize Go memory limit on mobile devices to prevent GC thrashing and OOM kills
+if ! grep -q 'GOMEMLIMIT' "$BASHRC" 2>/dev/null; then
+    echo 'export GOMEMLIMIT=1536MiB' >> "$BASHRC"
+    [ "$SILENT" -eq 0 ] && echo "      Added GOMEMLIMIT=1536MiB to ~/.bashrc"
 fi
 
 # Setup xdg-open bridge to termux-open-url so agy can open browser tabs for OAuth
@@ -281,6 +285,7 @@ echo "======================================================"
 
 # Prioritize IPv4 for Node tools while keeping Bionic netd for Go
 export NODE_OPTIONS="--dns-result-order=ipv4first"
+export GOMEMLIMIT=1536MiB
 export AGY_ENABLE_HUB=1
 
 # Auto-open browser as soon as server responds
@@ -341,6 +346,7 @@ case "$1" in
             termux-wake-lock 2>/dev/null || true
         fi
         export NODE_OPTIONS="--dns-result-order=ipv4first"
+        export GOMEMLIMIT=1536MiB
         AGY_ENABLE_HUB=1 nohup "$PREFIX/bin/agy-gui" > "$LOG_FILE" 2>&1 &
         echo $! > "$PID_FILE"
         sleep 1.5
@@ -390,7 +396,7 @@ chmod +x "$BIN_DIR/agy-patch-official" 2>/dev/null || true
 
 if [ "$SILENT" -eq 0 ]; then
     echo "======================================================"
-    echo " Antigravity Official Web GUI Setup Complete!         "
+    echo " Antigravity Web GUI Setup Complete!                  "
     echo "======================================================"
     echo " Commands available:"
     echo "   agy               : Interactive CLI agent"

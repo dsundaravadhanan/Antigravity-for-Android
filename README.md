@@ -40,9 +40,9 @@ Or if running from a local folder:
 bash install.sh
 ```
 
-**What the official automated installer does:**
+**What the automated installer does (for official Google binary):**
 1. Requests Android storage access via `termux-setup-storage`.
-2. Checks for Google's official `agy` binary. If not found, interactively offers to download and install it via `curl -fsSL https://antigravity.google/cli/install.sh | bash` with `export AGY_INSTALL_SKIP_LAUNCH=1`.
+2. Checks for Google's official `agy` binary. If not found, interactively offers to download and install it via `curl -fsSL https://antigravity.google/cli/install.sh | bash`.
 3. Resolves Termux PATH warnings by linking `~/.local/bin/agy -> $PREFIX/bin/agy` and updating `~/.bashrc`.
 4. Bridges `xdg-open` to `termux-open-url` so Google OAuth authentication tabs open automatically in your browser.
 5. Adds fast DNS settings (`no-aaaa`) to prevent network startup delays.
@@ -58,7 +58,6 @@ If you are using an older device or prefer the community repack build:
 ```bash
 termux-setup-storage
 pkg install glibc-repo glibc-runner python -y
-export AGY_INSTALL_SKIP_LAUNCH=1
 curl -fsSL https://raw.githubusercontent.com/wallentx/antigravity-cli-termux/dev/install.sh | bash
 curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/patch_gui.sh | bash
 ```
@@ -87,7 +86,6 @@ If you prefer to separate the core upstream CLI installation from the Web GUI cu
 ### Option A: Official Google CLI (Recommended)
 1. **Install upstream official Google CLI**:
    ```bash
-   export AGY_INSTALL_SKIP_LAUNCH=1
    curl -fsSL https://antigravity.google/cli/install.sh | bash
    ```
 2. **Apply Web GUI Setup**:
@@ -98,7 +96,6 @@ If you prefer to separate the core upstream CLI installation from the Web GUI cu
 ### Option B: Wallentx Community CLI (Legacy glibc)
 1. **Install core CLI engine** directly from [wallentx/antigravity-cli-termux](https://github.com/wallentx/antigravity-cli-termux):
    ```bash
-   export AGY_INSTALL_SKIP_LAUNCH=1
    curl -fsSL https://raw.githubusercontent.com/wallentx/antigravity-cli-termux/dev/install.sh | bash
    ```
 2. **Apply the legacy Web GUI Patch**:
@@ -130,7 +127,6 @@ termux-setup-storage
 #### 2. Install Official Google Antigravity CLI
 Download and install the official native Android build:
 ```bash
-export AGY_INSTALL_SKIP_LAUNCH=1
 curl -fsSL https://antigravity.google/cli/install.sh | bash
 ```
 
@@ -518,10 +514,10 @@ bash revert_gui.sh
 
 ---
 
-## Frequently Asked Questions (FAQ) & Search Queries
+## Frequently Asked Questions (FAQ)
 
 ### How do I install Google Antigravity on Android via Termux?
-Run the official automated setup script in Termux:
+Run the automated setup script in Termux:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/install.sh | bash
 ```
@@ -536,6 +532,20 @@ Start the server in Termux:
 - **Background mode**: Run `agy-service start` (allows minimizing or closing Termux while keeping the server alive).
 The launcher automatically opens your Android browser at `http://localhost:4400`.
 
+### How do I make the Antigravity Web GUI faster and smoother in Chrome?
+1. **Hardware-Accelerate Mobile Chrome (GPU Rasterization)**:
+   - In Chrome, open `chrome://flags`.
+   - Search for and enable:
+     - **GPU Rasterization** (`#enable-gpu-rasterization`) ➔ Set to **Enabled**
+     - **Override software rendering list** (`#ignore-gpu-blocklist`) ➔ Set to **Enabled**
+   - Tap **Relaunch** at the bottom of Chrome.
+2. **Install as a Standalone PWA**:
+   - Open `http://localhost:4400` in Chrome.
+   - Tap Chrome's three-dot menu (**⋮**) ➔ **Install app** (or **Add to Home screen**).
+   - Runs full-screen with dedicated GPU rendering and no browser URL bar overhead.
+3. **Go Memory Optimization**:
+   - `install.sh` automatically configures `export GOMEMLIMIT=1536MiB` in `~/.bashrc` to prevent GC thrashing and Android Low Memory Killer (LMK) process drops.
+
 ### How do I install Antigravity as a standalone Android app?
 When `http://localhost:4400` is open in Chrome:
 1. Tap the three-dot menu (**⋮**) in the top-right corner.
@@ -544,7 +554,7 @@ When `http://localhost:4400` is open in Chrome:
 The official Google Antigravity app icon is placed on your home screen and launches in full-screen standalone mode without URL bars.
 
 ### How does Google authentication work?
-On first launch, Antigravity displays an onboarding screen at `http://127.0.0.1:4400/onboard`. Tap **Continue with Google**, and the browser bridge automatically opens an OAuth sign-in tab. Once completed, tokens are stored securely in `~/.gemini/antigravity-cli/antigravity-oauth-token` (`chmod 600`).
+On first launch, Antigravity displays an onboarding screen at `http://localhost:4400/onboard`. Tap **Continue with Google**, and the browser bridge automatically opens an OAuth sign-in tab. Once completed, tokens are stored securely in `~/.gemini/antigravity-cli/antigravity-oauth-token` (`chmod 600`).
 
 ---
 
@@ -598,6 +608,30 @@ echo "options timeout:1 attempts:2 no-aaaa" >> $PREFIX/etc/resolv.conf
 echo 'export NODE_OPTIONS="--dns-result-order=ipv4first"' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+### 6. Interactive Prompt Options / Clarifying Question Buttons Unresponsive
+**Cause**: Mobile Chrome translates taps into touch gestures (`touchstart`/`touchend`) rather than desktop mouse clicks (`onClick`/`pointerup`), or soft keyboard viewport zoom displaces clickable coordinates.  
+**Fix**:
+1. **Enable Desktop Site**: Tap Chrome's three-dot menu (**⋮**) and check **Desktop site**. This restores standard desktop click handling.
+2. **Dismiss the Virtual Keyboard**: Close your phone's soft keyboard before tapping options so viewport scaling does not misalign the touch target.
+3. **Type Your Answer as Fallback**: If a touch tap is not captured, type the option number or text response directly into the chat prompt box and press Send.
+4. **Pull-to-Refresh**: Refresh the browser tab (`pull-to-refresh` or `Ctrl+R`) to re-sync any stale WebSocket connection.
+
+### 7. "Lost connection to the language server. Agent features may not work"
+**Cause**: Android suspending or killing Termux child processes (Language Server/LSP) when switching to Chrome, or loopback heartbeat timeouts.  
+**Fix**:
+- `install.sh` automatically calls `termux-wake-lock` to keep background services active.
+- Ensure Termux battery optimization is set to **Unrestricted** in Android App Settings.
+- Verify `$PREFIX/etc/hosts` contains `::1 localhost ip6-localhost` (automatically configured by `install.sh`).
+
+### 8. "There was an unexpected issue setting up your account: Failed to fetch"
+**Cause**: Accessing the Web GUI via `http://127.0.0.1:4400` instead of `http://localhost:4400`, or setting `GODEBUG="netdns=go"` which breaks external Android DNS.  
+**Fix**: Always access the Web GUI using `http://localhost:4400` so Google's Cloud OAuth whitelist permits authentication, and ensure `GODEBUG` is unset so Android's native `netd` daemon resolves `accounts.google.com`.
+
+---
+
+### Need Help or Found a Bug?
+If you encounter any unexpected issues, bugs, or have questions, please report them on the [GitHub Issues](https://github.com/dsundaravadhanan/Antigravity-for-Android/issues) page.
 
 ---
 
