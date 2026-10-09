@@ -11,7 +11,6 @@
   - Added steps for `localhost:4400` connection issues.
   - Added Android Phantom Process Killer workarounds.
   - Added browser OAuth bridge testing and IPv6 delay fixes.
-- **Repository URL Standardization**: Aligned all script and documentation references to the canonical `Antigravity-for-Android` repository.
 
 ### Release Assets
 - `assets/01-termux-install.jpg`: Terminal installation screenshot.
