@@ -13,10 +13,6 @@
   - Added browser OAuth bridge testing and IPv6 delay fixes.
 
 ### Release Assets
-- `assets/01-termux-install.jpg`: Terminal installation screenshot.
-- `assets/02-google-signin.jpg`: Google OAuth sign-in onboarding screen.
-- `assets/03-web-gui-workspace.jpg`: Antigravity Web GUI workspace screenshot.
-- `assets/04-settings-permissions.jpg`: Settings and permissions screenshot.
 - `install.sh`: Automated installer and environment optimizer.
 - `patch_gui.sh`: Legacy Web GUI patcher.
 - `revert_gui.sh`: Universal uninstaller.
