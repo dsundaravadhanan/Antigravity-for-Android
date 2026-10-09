@@ -111,16 +111,27 @@ if [ "$OFFICIAL_BIN" != "$BIN_DIR/agy" ]; then
     [ "$SILENT" -eq 0 ] && echo "      Linked $OFFICIAL_BIN -> $BIN_DIR/agy"
 fi
 
-# Ensure ~/.local/bin is also present in ~/.bashrc PATH
+# Ensure ~/.local/bin and fast networking variables are present in ~/.bashrc
 BASHRC="$HOME/.bashrc"
-if [ -f "$BASHRC" ]; then
-    if ! grep -q '\.local/bin' "$BASHRC" 2>/dev/null; then
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASHRC"
-        [ "$SILENT" -eq 0 ] && echo "      Added ~/.local/bin to ~/.bashrc"
-    fi
-else
-    echo 'export PATH="$HOME/.local/bin:$PATH"' > "$BASHRC"
-    [ "$SILENT" -eq 0 ] && echo "      Created ~/.bashrc with ~/.local/bin in PATH"
+if [ ! -f "$BASHRC" ]; then
+    touch "$BASHRC"
+fi
+
+if ! grep -q '\.local/bin' "$BASHRC" 2>/dev/null; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASHRC"
+    [ "$SILENT" -eq 0 ] && echo "      Added ~/.local/bin to ~/.bashrc"
+fi
+
+# Clean up GODEBUG override if present (preserves Android Bionic netd for external Google APIs)
+if grep -q 'GODEBUG.*netdns=go' "$BASHRC" 2>/dev/null; then
+    sed -i '/GODEBUG.*netdns=go/d' "$BASHRC" 2>/dev/null || true
+fi
+unset GODEBUG 2>/dev/null || true
+
+# Force Node.js (used by LSP / language tools) to prioritize IPv4
+if ! grep -q 'NODE_OPTIONS.*ipv4first' "$BASHRC" 2>/dev/null; then
+    echo 'export NODE_OPTIONS="--dns-result-order=ipv4first"' >> "$BASHRC"
+    [ "$SILENT" -eq 0 ] && echo "      Added NODE_OPTIONS=\"--dns-result-order=ipv4first\" to ~/.bashrc"
 fi
 
 # Setup xdg-open bridge to termux-open-url so agy can open browser tabs for OAuth
@@ -136,7 +147,20 @@ fi
 # [2/4] Network & Fast DNS Optimization
 # ==============================================================================
 if [ "$SILENT" -eq 0 ]; then
-    echo "[2/4] Optimizing DNS settings to prevent network delays..."
+    echo "[2/4] Optimizing DNS & hosts settings to prevent network delays..."
+fi
+
+# Fix Termux hosts mapping for dual-stack localhost resolution
+HOSTS_FILE="$PREFIX/etc/hosts"
+mkdir -p "$(dirname "$HOSTS_FILE")"
+if [ ! -f "$HOSTS_FILE" ] || ! grep -q '::1.*localhost' "$HOSTS_FILE" 2>/dev/null; then
+    cat << 'EOF' > "$HOSTS_FILE"
+127.0.0.1 localhost
+::1 localhost ip6-localhost
+EOF
+    [ "$SILENT" -eq 0 ] && echo "      Configured $HOSTS_FILE with fast localhost bindings."
+else
+    [ "$SILENT" -eq 0 ] && echo "      Hosts file already configured."
 fi
 
 RESOLV_CONF="$PREFIX/etc/resolv.conf"
@@ -200,7 +224,21 @@ done
 
 URL="http://localhost:${PORT}"
 
-# Ensure fast DNS
+# Acquire Termux wake lock to prevent Android from killing/suspending the language server
+if command -v termux-wake-lock >/dev/null 2>&1; then
+    termux-wake-lock 2>/dev/null || true
+fi
+
+# Ensure fast hosts and DNS settings
+HOSTS_FILE="$PREFIX/etc/hosts"
+if [ ! -f "$HOSTS_FILE" ] || ! grep -q '::1.*localhost' "$HOSTS_FILE" 2>/dev/null; then
+    mkdir -p "$(dirname "$HOSTS_FILE")"
+    cat << 'HEOF' > "$HOSTS_FILE"
+127.0.0.1 localhost
+::1 localhost ip6-localhost
+HEOF
+fi
+
 RESOLV_CONF="$PREFIX/etc/resolv.conf"
 if [ -f "$RESOLV_CONF" ] && ! grep -q "no-aaaa" "$RESOLV_CONF" 2>/dev/null; then
     echo "options timeout:1 attempts:2 no-aaaa" >> "$RESOLV_CONF"
@@ -241,6 +279,8 @@ echo " Engine : ${AGY_BIN}"
 echo " URL    : ${URL}"
 echo "======================================================"
 
+# Prioritize IPv4 for Node tools while keeping Bionic netd for Go
+export NODE_OPTIONS="--dns-result-order=ipv4first"
 export AGY_ENABLE_HUB=1
 
 # Auto-open browser as soon as server responds
@@ -297,6 +337,10 @@ case "$1" in
             exit 0
         fi
         echo "Starting Antigravity Web GUI in background..."
+        if command -v termux-wake-lock >/dev/null 2>&1; then
+            termux-wake-lock 2>/dev/null || true
+        fi
+        export NODE_OPTIONS="--dns-result-order=ipv4first"
         AGY_ENABLE_HUB=1 nohup "$PREFIX/bin/agy-gui" > "$LOG_FILE" 2>&1 &
         echo $! > "$PID_FILE"
         sleep 1.5

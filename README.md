@@ -1,6 +1,18 @@
-# Antigravity Local Web GUI for Termux
+# Antigravity for Android: Local Web GUI via Termux
 
-This repository provides an automated installation and setup guide to run the official Google Antigravity Web GUI inside Termux on Android. It configures the installed Antigravity CLI binary to work directly in your mobile browser as a local Web GUI on port 4400, automatically opening the chat and coding workspace.
+> Run Google Antigravity AI natively on Android with a full mobile Web GUI at `localhost:4400`. 100% standalone, no PC, VNC, or X11 required.
+
+---
+
+## Visual Showcase & Setup Walkthrough
+
+| 1. Termux One-Line Installation | 2. Google OAuth Onboarding |
+| :---: | :---: |
+| ![Termux Terminal Installation](assets/01-termux-install.jpg) | ![Google OAuth Sign-In](assets/02-google-signin.jpg) |
+
+| 3. Mobile Web GUI Chat Workspace | 4. Agent Permissions & Turbo Mode |
+| :---: | :---: |
+| ![Antigravity Web GUI Workspace](assets/03-web-gui-workspace.jpg) | ![Antigravity Settings and Permissions](assets/04-settings-permissions.jpg) |
 
 ---
 
@@ -20,7 +32,7 @@ This project builds on official releases and open source contributions from the 
 Run this command in Termux to install and configure everything automatically using Google's official native Android binary:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/antigravity-cli-termux-to-gui/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/install.sh | bash
 ```
 
 Or if running from a local folder:
@@ -48,7 +60,7 @@ termux-setup-storage
 pkg install glibc-repo glibc-runner python -y
 export AGY_INSTALL_SKIP_LAUNCH=1
 curl -fsSL https://raw.githubusercontent.com/wallentx/antigravity-cli-termux/dev/install.sh | bash
-curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/antigravity-cli-termux-to-gui/main/patch_gui.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/patch_gui.sh | bash
 ```
 
 ---
@@ -80,7 +92,7 @@ If you prefer to separate the core upstream CLI installation from the Web GUI cu
    ```
 2. **Apply Web GUI Setup**:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/antigravity-cli-termux-to-gui/main/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/install.sh | bash
    ```
 
 ### Option B: Wallentx Community CLI (Legacy glibc)
@@ -91,7 +103,7 @@ If you prefer to separate the core upstream CLI installation from the Web GUI cu
    ```
 2. **Apply the legacy Web GUI Patch**:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/antigravity-cli-termux-to-gui/main/patch_gui.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/patch_gui.sh | bash
    ```
    Or if you have the script locally on your phone:
    ```bash
@@ -491,17 +503,100 @@ The Web GUI running on `localhost:4400` is completely separated from the Termux 
 ## Reverting / Uninstalling Web GUI
 
 > [!WARNING]
-> **Data Loss & Session Disclaimer**: Running `revert_gui.sh` forcibly terminates active web server processes and cleans local runtime state. All conversations and data inside `localhost:4400` will be permanently deleted. Back up any critical code, prompts, or chat outputs prior to running this script. The repository author and contributors accept no responsibility or legal liability for any data loss, lost conversations, or workflow disruptions caused by executing this uninstaller (see [DISCLAIMER.md](https://github.com/dsundaravadhanan/Antigravity-CLI-to-GUI-for-Termux/blob/main/DISCLAIMER.md)).
+> **Data Loss & Session Disclaimer**: Running `revert_gui.sh` forcibly terminates active web server processes and cleans local runtime state. All conversations and data inside `localhost:4400` will be permanently deleted. Back up any critical code, prompts, or chat outputs prior to running this script. The repository author and contributors accept no responsibility or legal liability for any data loss, lost conversations, or workflow disruptions caused by executing this uninstaller (see [DISCLAIMER.md](DISCLAIMER.md)).
 
 To remove all Web GUI customizations, background daemon services, launchers, and network tweaks:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/antigravity-cli-termux-to-gui/main/revert_gui.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/revert_gui.sh | bash
 ```
 
 Or run locally:
 ```bash
 bash revert_gui.sh
+```
+
+---
+
+## Frequently Asked Questions (FAQ) & Search Queries
+
+### How do I install Google Antigravity on Android via Termux?
+Run the official automated setup script in Termux:
+```bash
+curl -fsSL https://raw.githubusercontent.com/dsundaravadhanan/Antigravity-for-Android/main/install.sh | bash
+```
+The script requests Termux storage permissions, installs or links Google's official native ARM64 binary (`agy`), configures browser OAuth redirection (`xdg-open` -> `termux-open-url`), applies network latency optimizations, and installs both `agy-gui` and the `agy-service` daemon.
+
+### Can Google Antigravity run on Android without a PC, root, or VNC?
+Yes. Unlike remote desktop solutions, cloud relays, or heavy Linux PRoot containers, this setup runs Google's official native Android binary directly inside Termux on Android's native Bionic libc. No root access, VNC viewer, or X11 desktop environment is needed.
+
+### How do I open and access the Antigravity Web GUI?
+Start the server in Termux:
+- **Foreground mode**: Run `agy-gui`.
+- **Background mode**: Run `agy-service start` (allows minimizing or closing Termux while keeping the server alive).
+The launcher automatically opens your Android browser at `http://localhost:4400`.
+
+### How do I install Antigravity as a standalone Android app?
+When `http://localhost:4400` is open in Chrome:
+1. Tap the three-dot menu (**⋮**) in the top-right corner.
+2. Tap **Install app** (or **Add to Home screen**).
+3. Confirm **Install**.
+The official Google Antigravity app icon is placed on your home screen and launches in full-screen standalone mode without URL bars.
+
+### How does Google authentication work?
+On first launch, Antigravity displays an onboarding screen at `http://127.0.0.1:4400/onboard`. Tap **Continue with Google**, and the browser bridge automatically opens an OAuth sign-in tab. Once completed, tokens are stored securely in `~/.gemini/antigravity-cli/antigravity-oauth-token` (`chmod 600`).
+
+---
+
+## Troubleshooting Common Errors
+
+### 1. `bash: agy: command not found`
+**Cause**: The binary directory is not in your active Termux environment `$PATH`.  
+**Fix**: Ensure your shell profile includes `~/.local/bin` and `$PREFIX/bin`:
+```bash
+echo 'export PATH="$HOME/.local/bin:$PREFIX/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 2. `This site can't be reached` / `ERR_CONNECTION_REFUSED` on `localhost:4400`
+**Cause**: The Antigravity Web GUI server is not running or crashed during background initialization.  
+**Fix**: Check status and logs:
+```bash
+agy-service status  # Check if PID is alive
+agy-service logs    # Check recent crash or launch logs
+agy-service start   # Restart server in background
+```
+Also verify that `localhost` is mapped correctly in Termux:
+```bash
+cat << 'EOF' > $PREFIX/etc/hosts
+127.0.0.1 localhost
+::1 localhost ip6-localhost
+EOF
+```
+
+### 3. Termux Process Killed / App Suspends When Minimized
+**Cause**: Android battery optimization or Android 12+ Phantom Process Killer terminating background services.  
+**Fix**:
+1. Run `termux-wake-lock` inside Termux to acquire a CPU wake lock.
+2. In Android Settings -> **Apps** -> **Termux** -> **Battery**, select **Unrestricted** (turn off battery optimization).
+3. If using Samsung (One UI), Xiaomi (MIUI/HyperOS), or OnePlus (OxygenOS), lock Termux in recent apps so it is not cleared from RAM.
+
+### 4. OAuth Browser Tab Does Not Open During Sign-In
+**Cause**: Missing or broken browser bridge (`xdg-open`).  
+**Fix**: Re-link `xdg-open` to `termux-open-url`:
+```bash
+ln -sf $(which termux-open-url) $PREFIX/bin/xdg-open
+chmod +x $PREFIX/bin/xdg-open
+```
+Test by running: `xdg-open https://google.com` (should open your default Android browser).
+
+### 5. Slow Startup or Network Timeout on Mobile Data (IPv6 Delay)
+**Cause**: Mobile carriers often fail or delay IPv6 AAAA DNS lookups.  
+**Fix**: Configure Termux resolver to prioritize IPv4:
+```bash
+echo "options timeout:1 attempts:2 no-aaaa" >> $PREFIX/etc/resolv.conf
+echo 'export NODE_OPTIONS="--dns-result-order=ipv4first"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ---

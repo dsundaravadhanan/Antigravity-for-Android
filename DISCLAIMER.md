@@ -2,7 +2,7 @@
 
 **PLEASE READ THIS DOCUMENT CAREFULLY BEFORE USING, INSTALLING, OR DISTRIBUTING THIS SOFTWARE.**
 
-By accessing, downloading, installing, running, or utilizing any code, scripts, or instructions in this repository (`antigravity-cli-termux-to-gui`), you explicitly agree to all terms and conditions set forth below. If you do not agree to these terms, do not install or use this software.
+By accessing, downloading, installing, running, or utilizing any code, scripts, or instructions in this repository (`Antigravity-for-Android`), you explicitly agree to all terms and conditions set forth below. If you do not agree to these terms, do not install or use this software.
 
 ---
 
