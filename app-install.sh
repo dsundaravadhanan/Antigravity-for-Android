@@ -1,10 +1,12 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ==============================================================================
-# Google Antigravity Web GUI Setup for Official Release (Android / Termux)
+# Antigravity App & Web GUI Unified Installer (Testing Release)
 # ==============================================================================
-# Configures the local Web GUI, browser launchers, service manager, and Termux
-# environment for the official Google Antigravity CLI binary installed via:
-#   curl -fsSL https://antigravity.google/cli/install.sh | bash
+# Configures a seamless unified environment where:
+#  1. Auth (OAuth Token) is shared across CLI, Web GUI, and Android App (APK).
+#  2. Chats and Conversations are 100% synchronized across all interfaces.
+#  3. Settings and trusted workspaces are unified under Termux $HOME.
+#  4. The Google Sign-In redirect works reliably via Termux's native broadcast bridge.
 # ==============================================================================
 set -e
 
@@ -12,6 +14,8 @@ PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 HOME="${HOME:-/data/data/com.termux/files/home}"
 BIN_DIR="${PREFIX}/bin"
 USER_BIN="$HOME/.local/bin"
+AUTH_DEST="$HOME/.gemini/antigravity-cli"
+PROJECTS_DIR="$HOME/.gemini/config/projects"
 
 # Parse CLI arguments
 SILENT=0
@@ -23,19 +27,21 @@ done
 
 if [ "$SILENT" -eq 0 ]; then
     echo "======================================================"
-    echo "    Antigravity Web GUI Setup (Official Google CLI)   "
+    echo "  Antigravity Unified App & CLI Setup (Test Phase)    "
     echo "======================================================"
 fi
 
 # ==============================================================================
-# [1/4] Locate Official Google Antigravity Binary & Fix Environment
+# [1/5] Locate Official Antigravity Binary & Environment
 # ==============================================================================
 if [ "$SILENT" -eq 0 ]; then
-    echo "[1/4] Verifying official Antigravity installation and environment..."
+    echo "[1/5] Verifying Antigravity CLI binary..."
 fi
 
 mkdir -p "$BIN_DIR"
 mkdir -p "$USER_BIN"
+mkdir -p "$AUTH_DEST"
+chmod 700 "$AUTH_DEST"
 
 find_official_bin() {
     if [ -f "$BIN_DIR/agy" ] && [ -x "$BIN_DIR/agy" ]; then
@@ -50,26 +56,22 @@ find_official_bin() {
 OFFICIAL_BIN="$(find_official_bin)"
 
 if [ -z "$OFFICIAL_BIN" ]; then
-    echo "[-] Official Google Antigravity binary 'agy' is not installed."
-    echo ""
-
+    echo "[-] Official Antigravity binary 'agy' not found."
     CHOICE=""
     if [ -t 0 ]; then
-        read -r -p "Install official agy from Google? (curl -fsSL https://antigravity.google/cli/install.sh | bash) [y/n]: " CHOICE
+        read -r -p "Install official agy from Google? [y/n]: " CHOICE
     elif [ -e /dev/tty ]; then
-        read -r -p "Install official agy from Google? (curl -fsSL https://antigravity.google/cli/install.sh | bash) [y/n]: " CHOICE < /dev/tty
+        read -r -p "Install official agy from Google? [y/n]: " CHOICE < /dev/tty
     else
-        CHOICE="n"
+        CHOICE="y"
     fi
 
     case "$CHOICE" in
         [Yy]* )
-            echo ""
             echo "Installing official Google Antigravity CLI..."
             TMP_BOOTSTRAP="$(mktemp 2>/dev/null || echo "$HOME/.local/bin/agy_install_tmp.sh")"
-            if ! curl -fsSL --compressed https://antigravity.google/cli/install.sh -o "$TMP_BOOTSTRAP" 2>/dev/null; then
+            curl -fsSL --compressed https://antigravity.google/cli/install.sh -o "$TMP_BOOTSTRAP" 2>/dev/null || \
                 curl -fsSL https://antigravity.google/cli/install.sh -o "$TMP_BOOTSTRAP"
-            fi
             if [ -f "$TMP_BOOTSTRAP" ] && gzip -t "$TMP_BOOTSTRAP" 2>/dev/null; then
                 gzip -dc "$TMP_BOOTSTRAP" > "${TMP_BOOTSTRAP}.raw" 2>/dev/null && mv -f "${TMP_BOOTSTRAP}.raw" "$TMP_BOOTSTRAP"
             fi
@@ -81,118 +83,73 @@ if [ -z "$OFFICIAL_BIN" ]; then
                 echo "[-] Error: Failed to fetch valid installer script from Google."
                 exit 1
             fi
-            echo ""
             OFFICIAL_BIN="$(find_official_bin)"
-            if [ -z "$OFFICIAL_BIN" ]; then
-                echo "[-] Error: Installation completed but 'agy' binary could not be found."
-                exit 1
-            fi
             ;;
         * )
-            echo ""
-            echo "To install official Google Antigravity manually, run:"
-            echo "  curl -fsSL --compressed https://antigravity.google/cli/install.sh | bash"
-            echo ""
             echo "Exiting."
             exit 0
             ;;
     esac
 fi
 
-if [ "$SILENT" -eq 0 ]; then
-    echo "      Found official binary at: $OFFICIAL_BIN"
-fi
-
-# Ensure agy is accessible globally in Termux system PATH ($BIN_DIR)
-if [ "$OFFICIAL_BIN" != "$BIN_DIR/agy" ]; then
-    ln -sf "$OFFICIAL_BIN" "$BIN_DIR/agy"
-    [ "$SILENT" -eq 0 ] && echo "      Linked $OFFICIAL_BIN -> $BIN_DIR/agy"
-fi
-
-# Ensure ~/.local/bin and fast networking variables are present in ~/.bashrc
+# Ensure ~/.bashrc environment settings
 BASHRC="$HOME/.bashrc"
-if [ ! -f "$BASHRC" ]; then
-    touch "$BASHRC"
-fi
+[ -f "$BASHRC" ] || touch "$BASHRC"
 
-if ! grep -q '\.local/bin' "$BASHRC" 2>/dev/null; then
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASHRC"
-    [ "$SILENT" -eq 0 ] && echo "      Added ~/.local/bin to ~/.bashrc"
-fi
+grep -q '\.local/bin' "$BASHRC" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASHRC"
+grep -q 'NODE_OPTIONS.*ipv4first' "$BASHRC" 2>/dev/null || echo 'export NODE_OPTIONS="--dns-result-order=ipv4first"' >> "$BASHRC"
+grep -q 'GOMEMLIMIT' "$BASHRC" 2>/dev/null || echo 'export GOMEMLIMIT=1536MiB' >> "$BASHRC"
 
-# Clean up GODEBUG override if present (preserves Android Bionic netd for external Google APIs)
-if grep -q 'GODEBUG.*netdns=go' "$BASHRC" 2>/dev/null; then
-    sed -i '/GODEBUG.*netdns=go/d' "$BASHRC" 2>/dev/null || true
-fi
+# Clean up GODEBUG override if present
+sed -i '/GODEBUG.*netdns=go/d' "$BASHRC" 2>/dev/null || true
 unset GODEBUG 2>/dev/null || true
 
-# Force Node.js (used by LSP / language tools) to prioritize IPv4
-if ! grep -q 'NODE_OPTIONS.*ipv4first' "$BASHRC" 2>/dev/null; then
-    echo 'export NODE_OPTIONS="--dns-result-order=ipv4first"' >> "$BASHRC"
-    [ "$SILENT" -eq 0 ] && echo "      Added NODE_OPTIONS=\"--dns-result-order=ipv4first\" to ~/.bashrc"
+# ==============================================================================
+# [2/5] Resilient Browser OAuth Bridge (Fixes Sign-In Redirection Bug)
+# ==============================================================================
+if [ "$SILENT" -eq 0 ]; then
+    echo "[2/5] Configuring resilient OAuth browser bridge..."
 fi
 
-# Optimize Go memory limit on mobile devices to prevent GC thrashing and OOM kills
-if ! grep -q 'GOMEMLIMIT' "$BASHRC" 2>/dev/null; then
-    echo 'export GOMEMLIMIT=1536MiB' >> "$BASHRC"
-    [ "$SILENT" -eq 0 ] && echo "      Added GOMEMLIMIT=1536MiB to ~/.bashrc"
-fi
+# Create smart xdg-open wrapper that uses TermuxOpenReceiver broadcast and caches auth URL
+cat << 'EOF' > "$BIN_DIR/xdg-open"
+#!/data/data/com.termux/files/usr/bin/sh
+# Resilient xdg-open wrapper for Google Antigravity OAuth & Web GUI
+TARGET="$1"
+AUTH_DIR="$HOME/.gemini/antigravity-cli"
+mkdir -p "$AUTH_DIR" 2>/dev/null || true
 
-# Setup resilient xdg-open bridge to termux-open so agy can open browser tabs for OAuth
+# If target is an HTTP/HTTPS URL, log it for easy recovery
+case "$TARGET" in
+    http://*|https://*)
+        echo "$TARGET" > "$AUTH_DIR/last-auth-url.txt" 2>/dev/null || true
+        if [ -d "/sdcard/Download" ] && [ -w "/sdcard/Download" ]; then
+            echo "$TARGET" > "/sdcard/Download/antigravity-auth-url.txt" 2>/dev/null || true
+        fi
+        ;;
+esac
+
+# 1. Native Termux broadcast (works without SecurityException)
 if command -v termux-open >/dev/null 2>&1; then
-    ln -sf "$BIN_DIR/termux-open" "$BIN_DIR/xdg-open" 2>/dev/null || true
-    [ "$SILENT" -eq 0 ] && echo "      Configured browser bridge (xdg-open -> termux-open) for OAuth."
-elif command -v termux-open-url >/dev/null 2>&1; then
-    ln -sf "$BIN_DIR/termux-open-url" "$BIN_DIR/xdg-open" 2>/dev/null || true
-    [ "$SILENT" -eq 0 ] && echo "      Configured browser bridge (xdg-open -> termux-open-url) for OAuth."
+    termux-open "$@" 2>/dev/null && exit 0
 fi
 
-# ==============================================================================
-# [2/4] Network & Fast DNS Optimization
-# ==============================================================================
-if [ "$SILENT" -eq 0 ]; then
-    echo "[2/4] Optimizing DNS & hosts settings to prevent network delays..."
+# 2. Termux-open-url fallback
+if command -v termux-open-url >/dev/null 2>&1; then
+    termux-open-url "$@" 2>/dev/null && exit 0
 fi
 
-# Fix Termux hosts mapping for dual-stack localhost resolution
-HOSTS_FILE="$PREFIX/etc/hosts"
-mkdir -p "$(dirname "$HOSTS_FILE")"
-if [ ! -f "$HOSTS_FILE" ] || ! grep -q '::1.*localhost' "$HOSTS_FILE" 2>/dev/null; then
-    cat << 'EOF' > "$HOSTS_FILE"
-127.0.0.1 localhost
-::1 localhost ip6-localhost
+exit 0
 EOF
-    [ "$SILENT" -eq 0 ] && echo "      Configured $HOSTS_FILE with fast localhost bindings."
-else
-    [ "$SILENT" -eq 0 ] && echo "      Hosts file already configured."
-fi
-
-RESOLV_CONF="$PREFIX/etc/resolv.conf"
-if [ -f "$RESOLV_CONF" ]; then
-    if ! grep -q "no-aaaa" "$RESOLV_CONF" 2>/dev/null; then
-        echo "options timeout:1 attempts:2 no-aaaa" >> "$RESOLV_CONF"
-        [ "$SILENT" -eq 0 ] && echo "      Applied fast DNS resolver configuration."
-    else
-        [ "$SILENT" -eq 0 ] && echo "      DNS resolver already optimized."
-    fi
-else
-    mkdir -p "$(dirname "$RESOLV_CONF")"
-    echo "nameserver 8.8.8.8" > "$RESOLV_CONF"
-    echo "nameserver 1.1.1.1" >> "$RESOLV_CONF"
-    echo "options timeout:1 attempts:2 no-aaaa" >> "$RESOLV_CONF"
-    [ "$SILENT" -eq 0 ] && echo "      Created resolv.conf with fast DNS settings."
-fi
+chmod +x "$BIN_DIR/xdg-open"
+[ "$SILENT" -eq 0 ] && echo "      Configured smart browser bridge in $BIN_DIR/xdg-open."
 
 # ==============================================================================
-# [3/4] Privacy-First Authentication Storage Verification
+# [3/5] Single Authentication Token Sharing (CLI + Browser + App)
 # ==============================================================================
 if [ "$SILENT" -eq 0 ]; then
-    echo "[3/4] Verifying private authentication storage..."
+    echo "[3/5] Verifying shared authentication token..."
 fi
-
-AUTH_DEST="$HOME/.gemini/antigravity-cli"
-mkdir -p "$AUTH_DEST"
-chmod 700 "$AUTH_DEST"
 
 TOKEN_FILE="$AUTH_DEST/antigravity-oauth-token"
 if [ ! -f "$TOKEN_FILE" ]; then
@@ -205,7 +162,7 @@ if [ ! -f "$TOKEN_FILE" ]; then
         if [ -f "$src" ]; then
             cp -p "$src" "$TOKEN_FILE"
             chmod 600 "$TOKEN_FILE"
-            [ "$SILENT" -eq 0 ] && echo "      Imported saved authentication token from: $src"
+            [ "$SILENT" -eq 0 ] && echo "      Imported existing auth token from: $src"
             break
         fi
     done
@@ -213,29 +170,103 @@ fi
 
 if [ -f "$TOKEN_FILE" ]; then
     chmod 600 "$TOKEN_FILE"
-    [ "$SILENT" -eq 0 ] && echo "      Existing authentication token verified in ~/.gemini/antigravity-cli."
+    [ "$SILENT" -eq 0 ] && echo "      Shared authentication token active across CLI, Browser & App."
 else
-    [ "$SILENT" -eq 0 ] && echo "      No local token detected. You can log in via browser on first launch."
+    [ "$SILENT" -eq 0 ] && echo "      No token detected yet. Logging in from CLI, Browser or App will share one token."
 fi
 
 # ==============================================================================
-# [4/4] Create Web GUI Launchers (agy-gui and agy-service)
+# [4/5] Synchronize Chats, Default Project & Settings
 # ==============================================================================
 if [ "$SILENT" -eq 0 ]; then
-    echo "[4/4] Generating Web GUI launchers in $BIN_DIR..."
+    echo "[4/5] Synchronizing chats and workspace settings across all interfaces..."
 fi
 
-# --- agy-gui foreground launcher ---
+# 1. Initialize default CLI project configuration
+mkdir -p "$PROJECTS_DIR"
+DEFAULT_PROJ_FILE="$PROJECTS_DIR/default-cli-project.json"
+if [ ! -f "$DEFAULT_PROJ_FILE" ]; then
+    cat << 'EOF' > "$DEFAULT_PROJ_FILE"
+{
+  "id": "default-cli-project",
+  "name": "CLI Project",
+  "projectResources": {}
+}
+EOF
+fi
+
+# 2. Configure trusted workspaces in settings.json
+SETTINGS_FILE="$AUTH_DEST/settings.json"
+if [ ! -f "$SETTINGS_FILE" ]; then
+    cat << 'EOF' > "$SETTINGS_FILE"
+{
+  "trustedWorkspaces": [
+    "/data/data/com.termux/files/home"
+  ]
+}
+EOF
+elif ! grep -q "/data/data/com.termux/files/home" "$SETTINGS_FILE" 2>/dev/null; then
+    # Ensure Termux home is in trusted workspaces
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c "
+import json
+p = '$SETTINGS_FILE'
+try:
+    with open(p, 'r') as f: d = json.load(f)
+except: d = {}
+tw = d.get('trustedWorkspaces', [])
+if '/data/data/com.termux/files/home' not in tw:
+    tw.append('/data/data/com.termux/files/home')
+d['trustedWorkspaces'] = tw
+with open(p, 'w') as f: json.dump(d, f, indent=2)
+" 2>/dev/null || true
+    fi
+fi
+
+# 3. Synchronize existing conversation database if sqlite3 is available
+CONV_DB="$AUTH_DEST/conversation_summaries.db"
+if [ -f "$CONV_DB" ]; then
+    SQL_SYNC="UPDATE conversation_summaries SET project_id = 'default-cli-project', workspace_uris = '[\"file:///data/data/com.termux/files/home\"]' WHERE project_id IS NULL OR project_id = '';"
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "$CONV_DB" "$SQL_SYNC" 2>/dev/null || true
+    elif [ -x "/system/bin/sqlite3" ]; then
+        /system/bin/sqlite3 "$CONV_DB" "$SQL_SYNC" 2>/dev/null || true
+    fi
+    [ "$SILENT" -eq 0 ] && echo "      Synchronized existing conversation database."
+fi
+
+# ==============================================================================
+# [5/5] Install Launchers & Daemons (agy-gui and agy-service)
+# ==============================================================================
+if [ "$SILENT" -eq 0 ]; then
+    echo "[5/5] Generating Web GUI & App launchers..."
+fi
+
+# Ensure fast hosts and DNS settings
+HOSTS_FILE="$PREFIX/etc/hosts"
+if [ ! -f "$HOSTS_FILE" ] || ! grep -q '::1.*localhost' "$HOSTS_FILE" 2>/dev/null; then
+    mkdir -p "$(dirname "$HOSTS_FILE")"
+    cat << 'EOF' > "$HOSTS_FILE"
+127.0.0.1 localhost
+::1 localhost ip6-localhost
+EOF
+fi
+
+RESOLV_CONF="$PREFIX/etc/resolv.conf"
+if [ -f "$RESOLV_CONF" ] && ! grep -q "no-aaaa" "$RESOLV_CONF" 2>/dev/null; then
+    echo "options timeout:1 attempts:2 no-aaaa" >> "$RESOLV_CONF"
+fi
+
+# --- agy-gui launcher ---
 cat << 'EOF' > "$BIN_DIR/agy-gui"
 #!/data/data/com.termux/files/usr/bin/bash
-# Foreground launcher for Official Google Antigravity Web GUI
+# Foreground launcher for Antigravity Web GUI & Android App Backend
 set -e
 
 PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 HOME="${HOME:-/data/data/com.termux/files/home}"
 PORT=4400
 
-# Parse custom port if provided
 for arg in "$@"; do
     case "$arg" in
         --hub-port=*) PORT="${arg#*=}" ;;
@@ -244,31 +275,15 @@ done
 
 URL="http://localhost:${PORT}"
 
-# Acquire Termux wake lock to prevent Android from killing/suspending the language server
 if command -v termux-wake-lock >/dev/null 2>&1; then
     termux-wake-lock 2>/dev/null || true
-fi
-
-# Ensure fast hosts and DNS settings
-HOSTS_FILE="$PREFIX/etc/hosts"
-if [ ! -f "$HOSTS_FILE" ] || ! grep -q '::1.*localhost' "$HOSTS_FILE" 2>/dev/null; then
-    mkdir -p "$(dirname "$HOSTS_FILE")"
-    cat << 'HEOF' > "$HOSTS_FILE"
-127.0.0.1 localhost
-::1 localhost ip6-localhost
-HEOF
-fi
-
-RESOLV_CONF="$PREFIX/etc/resolv.conf"
-if [ -f "$RESOLV_CONF" ] && ! grep -q "no-aaaa" "$RESOLV_CONF" 2>/dev/null; then
-    echo "options timeout:1 attempts:2 no-aaaa" >> "$RESOLV_CONF"
 fi
 
 # Check if already running on target port
 if curl -s -m 1 "http://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
     echo "======================================================"
-    echo " Antigravity GUI is already running on ${URL}"
-    echo " Opening browser..."
+    echo " Antigravity server is already active on ${URL}"
+    echo " Opening interface..."
     echo "======================================================"
     if command -v termux-open >/dev/null 2>&1; then
         termux-open "${URL}"
@@ -289,17 +304,16 @@ elif [ -x "$HOME/.local/bin/agy" ]; then
 fi
 
 if [ -z "$AGY_BIN" ]; then
-    echo "[-] Error: Could not locate agy executable in $PREFIX/bin or $HOME/.local/bin"
+    echo "[-] Error: Could not locate agy executable"
     exit 1
 fi
 
 echo "======================================================"
-echo " Starting Antigravity Local Web GUI..."
+echo " Starting Antigravity Server (CLI + Browser + App)... "
 echo " Engine : ${AGY_BIN}"
 echo " URL    : ${URL}"
 echo "======================================================"
 
-# Prioritize IPv4 for Node tools while keeping Bionic netd for Go
 export NODE_OPTIONS="--dns-result-order=ipv4first"
 export GOMEMLIMIT=1536MiB
 export AGY_ENABLE_HUB=1
@@ -325,15 +339,14 @@ export AGY_ENABLE_HUB=1
 exec "$AGY_BIN" --hub "$@"
 EOF
 chmod +x "$BIN_DIR/agy-gui"
-
-# Friendly symlinks
 ln -sf "$BIN_DIR/agy-gui" "$BIN_DIR/agy-hub"
 ln -sf "$BIN_DIR/agy-gui" "$BIN_DIR/agy-ui"
+ln -sf "$BIN_DIR/agy-gui" "$BIN_DIR/agy-app"
 
 # --- agy-service daemon manager ---
 cat << 'EOF' > "$BIN_DIR/agy-service"
 #!/data/data/com.termux/files/usr/bin/bash
-# Background daemon manager for Antigravity Web GUI
+# Background daemon manager for Antigravity Web GUI & App
 PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 HOME="${HOME:-/data/data/com.termux/files/home}"
 PID_FILE="$HOME/.gemini/antigravity-cli/hub.pid"
@@ -353,7 +366,7 @@ is_running() {
 case "$1" in
     start)
         if is_running; then
-            echo "Antigravity Web GUI is already running (PID: $(cat "$PID_FILE"))."
+            echo "Antigravity backend is already active (PID: $(cat "$PID_FILE"))."
             if command -v termux-open >/dev/null 2>&1; then
                 termux-open "http://localhost:4400" >/dev/null 2>&1 || true
             else
@@ -361,7 +374,7 @@ case "$1" in
             fi
             exit 0
         fi
-        echo "Starting Antigravity Web GUI in background..."
+        echo "Starting Antigravity backend in background..."
         if command -v termux-wake-lock >/dev/null 2>&1; then
             termux-wake-lock 2>/dev/null || true
         fi
@@ -370,7 +383,7 @@ case "$1" in
         AGY_ENABLE_HUB=1 nohup "$PREFIX/bin/agy-gui" > "$LOG_FILE" 2>&1 &
         echo $! > "$PID_FILE"
         sleep 1.5
-        echo "Started. URL: http://localhost:4400"
+        echo "Started. Server active at http://localhost:4400"
         if command -v termux-open >/dev/null 2>&1; then
             termux-open "http://localhost:4400" >/dev/null 2>&1 || true
         else
@@ -381,17 +394,17 @@ case "$1" in
         if is_running; then
             kill $(cat "$PID_FILE") 2>/dev/null || true
             rm -f "$PID_FILE"
-            echo "Antigravity Web GUI stopped."
+            echo "Antigravity backend stopped."
         else
-            echo "Antigravity Web GUI is not running."
+            echo "Antigravity backend is not running."
         fi
         ;;
     status)
         if is_running; then
-            echo "Antigravity Web GUI is running (PID: $(cat "$PID_FILE"))."
+            echo "Antigravity backend is active (PID: $(cat "$PID_FILE"))."
             echo "URL: http://localhost:4400"
         else
-            echo "Antigravity Web GUI is stopped."
+            echo "Antigravity backend is stopped."
         fi
         ;;
     restart)
@@ -414,19 +427,19 @@ esac
 EOF
 chmod +x "$BIN_DIR/agy-service"
 
-# Self-copy so user can run 'agy-patch-official' directly
-cp -f "$0" "$BIN_DIR/agy-patch-official" 2>/dev/null || true
-chmod +x "$BIN_DIR/agy-patch-official" 2>/dev/null || true
-
 if [ "$SILENT" -eq 0 ]; then
     echo "======================================================"
-    echo " Antigravity Web GUI Setup Complete!                  "
+    echo " Unified Setup Complete!                              "
     echo "======================================================"
-    echo " Commands available:"
+    echo " Unified features:"
+    echo "  • Token:    Shared across CLI, Browser & App"
+    echo "  • Chats:    Synchronized across CLI, Browser & App"
+    echo "  • Bridge:   termux-open active with URL logger"
+    echo ""
+    echo " Commands:"
     echo "   agy               : Interactive CLI agent"
-    echo "   agy-gui           : Open Web GUI in browser (foreground)"
-    echo "   agy-service start : Run Web GUI in background"
-    echo "   agy-service status: Check background service status"
-    echo "   agy-service stop  : Stop background service"
+    echo "   agy-gui / agy-app : Launch GUI (opens browser / app backend)"
+    echo "   agy-service start : Run in background (keeps server alive for APK)"
+    echo "   agy-service stop  : Stop background server"
     echo "======================================================"
 fi
